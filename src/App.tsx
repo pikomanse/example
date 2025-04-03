@@ -9,19 +9,19 @@ const App: Component = () => {
     const [pikoman, _p] = createSignal(new Pikoman(SOLID_APP_PIKOMAN_APP));
     const [lastMessage, setLastMessage] = createSignal("");
     createEffect(() => {
-        const channel = pikoman().listen("all-channel");
+        const channel = pikoman().listen("main-channel");
 
-        channel.on("weather-notification", (e) => {
-            setLastMessage(e.data);
+        channel.on("latest-notification", (e) => {
+            setLastMessage(e.message);
         });
-      return () => {
-      }
+        return () => {
+        }
     }, []);
-  return (
-    <div class={styles.App}>
+    return (
+        <div class={styles.App}>
             Last message: {lastMessage()}
-    </div>
-  );
+        </div>
+    );
 };
 
 export default App;
