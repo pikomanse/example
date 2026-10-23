@@ -3,7 +3,9 @@
   "private": true,
   "type": "module",
   "license": "MIT",
-  "engines": { "node": ">=20" },
+  "engines": {
+    "node": ">=20"
+  },
   "scripts": {
     "dev": "vite",
     "server": "node server.mjs",
@@ -11,7 +13,7 @@
     "preview": "vite preview"
   },
   "dependencies": {
-    "@pikoman/ws": "1.0.0-rc.1",
+    "@pikoman/ws": "1.0.0-rc.2",
     "solid-js": "^1.9.17"
   },
   "devDependencies": {
