@@ -1,50 +1,55 @@
-## Usage
+# Pikoman example
 
-Those templates dependencies are maintained via [pnpm](https://pnpm.io) via `pnpm up -Lri`.
+A small [Solid](https://solidjs.com) page on [Pikoman](https://pikoman.se) protocol 2.0
+(`@pikoman/ws` 1.0):
 
-This is the reason you see a `pnpm-lock.yaml`. That being said, any package manager will work. This file can be safely be removed once you clone a template.
+- **A public channel**, `main-channel`: the page shows the latest message your backend publishes.
+- **A presence channel**, `presence-lobby`: join with a name, see who is online, chat. Joining needs
+  a token signed by your backend; `server.mjs` is that backend, in 60 lines and no dependencies.
+
+## Setup
+
+1. Create an app in the [dashboard](https://pikoman.se/dashboard/) and let it generate the keys.
+   You get the app id, an API key and a private key; the private key is shown only once.
+2. Put the app id in `.env.local`:
+
+   ```bash
+   cp .env.example .env.local   # VITE_PIKOMAN_APP=app-yourapp
+   npm install
+   ```
+
+3. Start the token server with the private key (it never goes in the page), and the page:
+
+   ```bash
+   PIKOMAN_PRIVATE_KEY=... npm run server   # http://localhost:3001
+   npm run dev                              # http://localhost:3000
+   ```
+
+   On Windows PowerShell: `$env:PIKOMAN_PRIVATE_KEY = "..."; npm run server`.
+
+## Publish from your backend
+
+Messages to a channel are sent over HTTP with the app's API key:
 
 ```bash
-$ npm install # or pnpm install or yarn install
+curl -u app-yourapp:$PIKOMAN_API_KEY \
+  -H 'content-type: application/json' \
+  -d '{"message": "hello world"}' \
+  https://next-api.pikoman.se/main-channel/latest-notification
 ```
 
-### Learn more on the [Solid Website](https://solidjs.com) and come chat with us on our [Discord](https://discord.com/invite/solidjs)
+The page shows "hello world" at once.
 
-## Setup 
-`.env.local` and if you want to have one for production use: `.env.production`
+## Join tokens
 
-## Post with curl
+`server.mjs` signs a JWT with EdDSA (Ed25519) for one connection and one channel:
+`connection`, `channel`, `access` (3: a full member), `data` (what the others see about you) and
+`exp` (at most 10 minutes ahead). Only channels it allows get a token. More, with PHP and other
+languages: [Protocol 2.0](https://pikoman.se/docs/v2/).
 
-```bash
-curl -X POST https://api.pikoman.se/{channel}/{event} -u {appName}:{password} -d '{data}'
-```
+While 2.0 runs next to 1.x, the client connects to `wss://next.pikoman.se` and publishing goes to
+`https://next-api.pikoman.se`; they move to `ws.` and `api.pikoman.se` with `@pikoman/ws` 1.0.0.
 
-### Example
+## License
 
-```bash
-curl -X POST https://api.pikoman.se/main-channel/latest-notification -u app-s
-howcase:mypassword -d '{"message": "hello world"}'
-```
-
-## Available Scripts
-
-In the project directory, you can run:
-
-### `npm run dev` or `npm start`
-
-Runs the app in the development mode.<br>
-Open [http://localhost:3000](http://localhost:3000) to view it in the browser.
-
-The page will reload if you make edits.<br>
-
-### `npm run build`
-
-Builds the app for production to the `dist` folder.<br>
-It correctly bundles Solid in production mode and optimizes the build for the best performance.
-
-The build is minified and the filenames include the hashes.<br>
-Your app is ready to be deployed!
-
-## Deployment
-
-You can deploy the `dist` folder to any static host provider (netlify, surge, now, etc.)
+MIT
