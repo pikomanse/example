@@ -50,7 +50,7 @@ Every open page shows the banner at once.
 `server.mjs` signs a JWT with EdDSA (Ed25519) for one connection and one channel:
 `connection`, `channel`, `access` (3: a full member), `data` (what the others see about you) and
 `exp` (at most 10 minutes ahead). Only channels it allows get a token. More, with PHP and other
-languages: [Protocol 2.0](https://pikoman.se/docs/v2/).
+languages: the [quickstart](https://pikoman.se/docs/#token) and [Protocol 2.0](https://pikoman.se/docs/v2/).
 
 While 2.0 runs next to 1.x, the client connects to `wss://next.pikoman.se` and publishing goes to
 `https://next-api.pikoman.se`; they move to `ws.` and `api.pikoman.se` with `@pikoman/ws` 1.0.0.
