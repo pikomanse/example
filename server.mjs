@@ -28,6 +28,10 @@ const signingKey = keyText.startsWith("-----")
   ? createPrivateKey(keyText)
   : createPrivateKey({ key: Buffer.from(keyText, "base64"), format: "der", type: "pkcs8" });
 
+/** Each visitor's cursor colour, picked here so everyone sees the same one. */
+const COLORS = ["#ff7eb6", "#ffd84d", "#7ee787", "#79c0ff", "#d2a8ff", "#ffa657"];
+const colorFor = (connection) => COLORS[parseInt(connection.slice(-6), 36) % COLORS.length];
+
 const base64url = (value) => Buffer.from(JSON.stringify(value)).toString("base64url");
 
 /** A JWT signed with EdDSA, for one connection and one channel. */
@@ -61,5 +65,5 @@ createServer((request, response) => {
   if (!ALLOWED_CHANNELS.includes(channel)) {
     return answer(response, 403, { error: "Not allowed into that channel" });
   }
-  answer(response, 200, { token: pikomanToken({ connection, channel, data: { name } }) });
+  answer(response, 200, { token: pikomanToken({ connection, channel, data: { name, color: colorFor(connection) } }) });
 }).listen(PORT, () => console.log(`Signing join tokens on http://localhost:${PORT}`));

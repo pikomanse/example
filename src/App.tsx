@@ -1,12 +1,21 @@
 import { type Component, createSignal, For, onCleanup, Show } from 'solid-js';
+import { createStore, produce } from 'solid-js/store';
 import Pikoman from '@pikoman/ws';
 
 import styles from './App.module.css';
 
-type Member = { name: string };
-type Message = { from: string; text: string };
+/** What server.mjs puts in the token: everyone in the channel sees it. */
+type Member = { name: string; color: string };
+type Cursor = { x: number; y: number };
+type Reaction = { id: number; x: number; y: number; emoji: string };
 
-const pikoman = new Pikoman(import.meta.env.VITE_PIKOMAN_APP);
+const EMOJI = ['👋', '🎉', '❤️', '🔥', '👀', '🚀'];
+/** Pikoman lets a connection send a message every 20 ms; 50 ms is smooth enough for a cursor. */
+const MOVE_EVERY_MS = 50;
+
+const pikoman = new Pikoman(import.meta.env.VITE_PIKOMAN_APP, {
+  ...(import.meta.env.VITE_PIKOMAN_WS ? { ws_address: import.meta.env.VITE_PIKOMAN_WS } : {}),
+});
 
 /** Asks our own backend (server.mjs) for a join token. */
 const authenticator = (name: string) => ({
@@ -19,69 +28,115 @@ const authenticator = (name: string) => ({
 });
 
 const App: Component = () => {
-  // 1. A public channel: anyone with the app id may listen. Your backend publishes to it with the
-  //    API key (see the curl in the README).
-  const [lastMessage, setLastMessage] = createSignal('');
-  const news = pikoman.listen('main-channel');
-  news.on('latest-notification', (data: { message: string }) => setLastMessage(data.message));
-  onCleanup(() => pikoman.leaveChannel('main-channel'));
+  // A public channel: anyone with the app id may listen. Your backend publishes to it with the
+  // API key (the curl in the README), and the message shows up here as a banner.
+  const [announcement, setAnnouncement] = createSignal('');
+  let hideAnnouncement: number | undefined;
+  pikoman.listen('main-channel').on('announcement', (data: { message: string }) => {
+    setAnnouncement(data.message);
+    clearTimeout(hideAnnouncement);
+    hideAnnouncement = window.setTimeout(() => setAnnouncement(''), 6000);
+  });
 
-  // 2. A presence channel: only with a token from your backend, and everyone sees who is in it.
-  const [name, setName] = createSignal('');
-  const [joined, setJoined] = createSignal(false);
+  // A presence channel: a token from your backend gets you in, and everyone sees who is here.
+  const [name, setName] = createSignal(localStorage.getItem('name') ?? '');
   const [members, setMembers] = createSignal<[string, Member][]>([]);
-  const [messages, setMessages] = createSignal<Message[]>([]);
+  const [cursors, setCursors] = createStore<Record<string, Cursor>>({});
+  const [reactions, setReactions] = createSignal<Reaction[]>([]);
+  const [emoji, setEmoji] = createSignal(EMOJI[0]);
+  const [joined, setJoined] = createSignal(false);
   let room: ReturnType<typeof pikoman.listenPresence> | undefined;
+
+  const react = (reaction: Omit<Reaction, 'id'>) => {
+    const id = Math.random();
+    setReactions((all) => [...all, { ...reaction, id }]);
+    setTimeout(() => setReactions((all) => all.filter((r) => r.id !== id)), 1600);
+  };
 
   const join = (event: SubmitEvent) => {
     event.preventDefault();
+    localStorage.setItem('name', name());
     room = pikoman.listenPresence('presence-lobby', authenticator(name()));
-    room.members((list: Map<string, Member>) => setMembers([...list]));
-    room.on('message', (from: string, data: { text: string }) => {
-      const sender = room?.getMember(from)?.name ?? 'Someone';
-      setMessages((all) => [...all, { from: sender, text: data.text }]);
+    room.members((list: Map<string, Member>) => {
+      setMembers([...list]);
+      // Someone left: drop their cursor.
+      setCursors(produce((all) => Object.keys(all).forEach((id) => list.has(id) || delete all[id])));
     });
+    // Client events come with the sender's connection id first.
+    room.on('move', (from: string, cursor: Cursor) => setCursors(from, cursor));
+    room.on('react', (_from: string, reaction: Omit<Reaction, 'id'>) => react(reaction));
     setJoined(true);
   };
 
-  const send = (event: SubmitEvent) => {
-    event.preventDefault();
-    const input = (event.currentTarget as HTMLFormElement).elements.namedItem('text') as HTMLInputElement;
-    const text = input.value.trim();
-    if (text) room?.send('message', { text }, true);
-    input.value = '';
+  // Positions go out as fractions of the window, so they land right on any screen size.
+  let lastMove = 0;
+  const onPointerMove = (event: PointerEvent) => {
+    const now = performance.now();
+    if (!room || now - lastMove < MOVE_EVERY_MS) return;
+    lastMove = now;
+    room.send('move', { x: event.clientX / innerWidth, y: event.clientY / innerHeight });
   };
+  const onPointerDown = (event: PointerEvent) => {
+    if (!room || (event.target as HTMLElement).closest('button, form')) return;
+    const reaction = { x: event.clientX / innerWidth, y: event.clientY / innerHeight, emoji: emoji() };
+    react(reaction); // ours shows at once; the others get it from Pikoman
+    room.send('react', reaction);
+  };
+  onCleanup(() => pikoman.leaveChannel('presence-lobby'));
+
+  const member = (id: string) => members().find(([memberId]) => memberId === id)?.[1];
 
   return (
-    <main class={styles.App}>
-      <h1>Pikoman example</h1>
+    <main class={styles.stage} onPointerMove={onPointerMove} onPointerDown={onPointerDown}>
+      <header class={styles.bar}>
+        <strong>Pikoman lobby</strong>
+        <div class={styles.people}>
+          <For each={members()}>
+            {([, m]) => <span class={styles.avatar} style={{ background: m.color }} title={m.name}>{m.name[0]}</span>}
+          </For>
+          <Show when={members().length}><span>{members().length} online</span></Show>
+        </div>
+      </header>
 
-      <section>
-        <h2>Public channel</h2>
-        <p>Last message on <code>main-channel</code>: {lastMessage() || '(none yet)'}</p>
-      </section>
+      <Show when={announcement()}>
+        <div class={styles.announcement}>📣 {announcement()}</div>
+      </Show>
 
-      <section>
-        <h2>Presence channel</h2>
-        <Show
-          when={joined()}
-          fallback={
-            <form onSubmit={join}>
-              <input placeholder="Your name" value={name()} onInput={(e) => setName(e.currentTarget.value)} required />
-              <button>Join the lobby</button>
-            </form>
-          }
-        >
-          <p>Online: {members().map(([, member]) => member.name).join(', ') || '…'}</p>
-          <ul>
-            <For each={messages()}>{(message) => <li><b>{message.from}:</b> {message.text}</li>}</For>
-          </ul>
-          <form onSubmit={send}>
-            <input name="text" placeholder="Say something" autocomplete="off" />
-            <button>Send</button>
+      <Show
+        when={joined()}
+        fallback={
+          <form class={styles.join} onSubmit={join}>
+            <h1>Live cursors, in 150 lines</h1>
+            <p>Join, then open this page in another window.</p>
+            <input placeholder="Your name" value={name()} onInput={(e) => setName(e.currentTarget.value)} maxlength="32" required />
+            <button>Join the lobby</button>
           </form>
-        </Show>
-      </section>
+        }
+      >
+        <p class={styles.hint}>Move your mouse. Click to react.</p>
+        <nav class={styles.picker}>
+          <For each={EMOJI}>
+            {(e) => <button classList={{ [styles.picked]: e === emoji() }} onClick={() => setEmoji(e)}>{e}</button>}
+          </For>
+        </nav>
+      </Show>
+
+      <For each={Object.entries(cursors)}>
+        {([id, cursor]) => (
+          <Show when={member(id)}>
+            {(m) => (
+              <div class={styles.cursor} style={{ transform: `translate(${cursor.x * innerWidth}px, ${cursor.y * innerHeight}px)` }}>
+                <svg width="22" height="22" viewBox="0 0 24 24"><path d="M3 2l18 8-8 2.5L10 21z" fill={m().color} stroke="#0b1020" stroke-width="1.5" /></svg>
+                <span style={{ background: m().color }}>{m().name}</span>
+              </div>
+            )}
+          </Show>
+        )}
+      </For>
+
+      <For each={reactions()}>
+        {(r) => <span class={styles.reaction} style={{ left: `${r.x * 100}%`, top: `${r.y * 100}%` }}>{r.emoji}</span>}
+      </For>
     </main>
   );
 };

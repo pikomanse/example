@@ -1,15 +1,174 @@
-.App {
-  max-width: 40rem;
-  margin: 0 auto;
-  padding: 2rem 1rem;
-  line-height: 1.5;
+.stage {
+  position: fixed;
+  inset: 0;
+  overflow: hidden;
+  color: #e8ecf8;
+  background:
+    radial-gradient(circle at 20% 15%, rgba(124, 92, 255, 0.35), transparent 45%),
+    radial-gradient(circle at 85% 80%, rgba(0, 200, 170, 0.25), transparent 45%),
+    radial-gradient(rgba(255, 255, 255, 0.08) 1px, transparent 1px) 0 0 / 24px 24px,
+    #0b1020;
+  user-select: none;
 }
 
-.App section {
-  margin-top: 2rem;
-}
-
-.App form {
+.bar {
+  position: absolute;
+  inset: 0 0 auto;
   display: flex;
-  gap: 0.5rem;
+  align-items: center;
+  justify-content: space-between;
+  padding: 1rem 1.5rem;
+  font-size: 1.1rem;
+}
+
+.people {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+  font-size: 0.9rem;
+  opacity: 0.9;
+}
+
+.avatar {
+  display: grid;
+  place-items: center;
+  width: 2rem;
+  height: 2rem;
+  margin-left: -1.1rem;
+  border: 2px solid #0b1020;
+  border-radius: 50%;
+  color: #0b1020;
+  font-weight: 700;
+  text-transform: uppercase;
+}
+
+.join {
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  translate: -50% -50%;
+  display: grid;
+  gap: 0.75rem;
+  width: min(22rem, calc(100% - 2rem));
+  padding: 2rem;
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  border-radius: 1rem;
+  background: rgba(15, 20, 40, 0.75);
+  backdrop-filter: blur(8px);
+  text-align: center;
+}
+
+.join h1 {
+  margin: 0;
+  font-size: 1.5rem;
+}
+
+.join p {
+  margin: 0 0 0.5rem;
+  opacity: 0.7;
+}
+
+.join input,
+.join button {
+  padding: 0.7rem 0.9rem;
+  border: 1px solid rgba(255, 255, 255, 0.15);
+  border-radius: 0.6rem;
+  font: inherit;
+}
+
+.join input {
+  background: rgba(255, 255, 255, 0.06);
+  color: inherit;
+}
+
+.join button {
+  border: 0;
+  background: linear-gradient(135deg, #7c5cff, #00c8aa);
+  color: white;
+  font-weight: 600;
+  cursor: pointer;
+}
+
+.hint {
+  position: absolute;
+  top: 45%;
+  width: 100%;
+  margin: 0;
+  text-align: center;
+  font-size: 1.4rem;
+  opacity: 0.25;
+  pointer-events: none;
+}
+
+.picker {
+  position: absolute;
+  bottom: 1.5rem;
+  left: 50%;
+  translate: -50% 0;
+  display: flex;
+  gap: 0.25rem;
+  padding: 0.4rem;
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  border-radius: 999px;
+  background: rgba(15, 20, 40, 0.8);
+}
+
+.picker button {
+  width: 2.6rem;
+  height: 2.6rem;
+  border: 0;
+  border-radius: 50%;
+  background: none;
+  font-size: 1.3rem;
+  cursor: pointer;
+}
+
+.picker .picked {
+  background: rgba(255, 255, 255, 0.14);
+}
+
+.announcement {
+  position: absolute;
+  top: 4.5rem;
+  left: 50%;
+  translate: -50% 0;
+  padding: 0.7rem 1.2rem;
+  border-radius: 999px;
+  background: #ffd84d;
+  color: #0b1020;
+  font-weight: 600;
+  box-shadow: 0 10px 30px rgba(0, 0, 0, 0.35);
+}
+
+.cursor {
+  position: absolute;
+  top: 0;
+  left: 0;
+  transition: transform 80ms linear;
+  pointer-events: none;
+}
+
+.cursor span {
+  display: inline-block;
+  margin: 1rem 0 0 0.1rem;
+  padding: 0.15rem 0.55rem;
+  border-radius: 999px;
+  color: #0b1020;
+  font-size: 0.8rem;
+  font-weight: 700;
+  white-space: nowrap;
+}
+
+.reaction {
+  position: absolute;
+  translate: -50% -50%;
+  font-size: 2.2rem;
+  pointer-events: none;
+  animation: float 1.6s ease-out forwards;
+}
+
+@keyframes float {
+  from { transform: scale(0.4); opacity: 1; }
+  20% { transform: scale(1.2); }
+  to { transform: translateY(-120px) scale(1); opacity: 0; }
 }

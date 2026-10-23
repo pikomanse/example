@@ -1,11 +1,16 @@
 # Pikoman example
 
-A small [Solid](https://solidjs.com) page on [Pikoman](https://pikoman.se) protocol 2.0
-(`@pikoman/ws` 1.0):
+![Live cursors with Pikoman](docs/screenshot.png)
 
-- **A public channel**, `main-channel`: the page shows the latest message your backend publishes.
-- **A presence channel**, `presence-lobby`: join with a name, see who is online, chat. Joining needs
-  a token signed by your backend; `server.mjs` is that backend, in 60 lines and no dependencies.
+Live cursors, reactions and who's online, on [Pikoman](https://pikoman.se) in one small
+[Solid](https://solidjs.com) page and a 70-line backend.
+
+- **Live cursors**: everyone's pointer, with their name and colour, as they move.
+- **Emoji reactions**: click anywhere and everyone sees it float up.
+- **Who's online**: a presence channel, `presence-lobby`, keeps the list. Joining needs a token
+  signed by your backend; `server.mjs` is that backend, with no dependencies.
+- **A banner from your backend**: one `curl` to the public channel `main-channel` shows up on every
+  open page at once.
 
 ## Setup
 
@@ -34,11 +39,11 @@ Messages to a channel are sent over HTTP with the app's API key:
 ```bash
 curl -u app-yourapp:$PIKOMAN_API_KEY \
   -H 'content-type: application/json' \
-  -d '{"message": "hello world"}' \
-  https://next-api.pikoman.se/main-channel/latest-notification
+  -d '{"message": "Deploy finished: v2.4 is live"}' \
+  https://next-api.pikoman.se/main-channel/announcement
 ```
 
-The page shows "hello world" at once.
+Every open page shows the banner at once.
 
 ## Join tokens
 
