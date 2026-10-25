@@ -10,26 +10,26 @@ type Cursor = { x: number; y: number };
 type Reaction = { id: number; x: number; y: number; emoji: string };
 
 const EMOJI = ['👋', '🎉', '❤️', '🔥', '👀', '🚀'];
-/** Pikoman lets a connection send a message every 20 ms; 50 ms is smooth enough for a cursor. */
-const MOVE_EVERY_MS = 50;
+/** Pikoman lets a connection send 10 client events a second; leave room for reactions. */
+const MOVE_EVERY_MS = 125;
 
 const pikoman = new Pikoman(import.meta.env.VITE_PIKOMAN_APP, {
   ...(import.meta.env.VITE_PIKOMAN_WS ? { ws_address: import.meta.env.VITE_PIKOMAN_WS } : {}),
 });
 
-/** Asks our own backend (server.mjs) for a join token. */
-const authenticator = (name: string) => ({
+/** Asks our own backend (server.mjs) for a join token: it knows who you are from your session. */
+const authenticator = {
   async authenticate(clientId: string, channel: string): Promise<string> {
-    const query = new URLSearchParams({ client: clientId, channel, name });
+    const query = new URLSearchParams({ client: clientId, channel });
     const response = await fetch(`/pikoman/auth?${query}`);
     if (!response.ok) throw new Error(`No join token (${response.status})`);
     return (await response.json()).token;
   },
-});
+};
 
 const App: Component = () => {
-  // A public channel: anyone with the app id may listen. Your backend publishes to it with the
-  // API key (the curl in the README), and the message shows up here as a banner.
+  // A public channel: anyone with the app id may listen. Your backend publishes to it, signed with
+  // its API key ("Publish from your backend" in the README), and the message shows up as a banner.
   const [announcement, setAnnouncement] = createSignal('');
   let hideAnnouncement: number | undefined;
   pikoman.listen('main-channel').on('announcement', (data: { message: string }) => {
@@ -45,6 +45,7 @@ const App: Component = () => {
   const [reactions, setReactions] = createSignal<Reaction[]>([]);
   const [emoji, setEmoji] = createSignal(EMOJI[0]);
   const [joined, setJoined] = createSignal(false);
+  const [joining, setJoining] = createSignal(false);
   let room: ReturnType<typeof pikoman.listenPresence> | undefined;
 
   const react = (reaction: Omit<Reaction, 'id'>) => {
@@ -53,19 +54,33 @@ const App: Component = () => {
     setTimeout(() => setReactions((all) => all.filter((r) => r.id !== id)), 1600);
   };
 
-  const join = (event: SubmitEvent) => {
+  const join = async (event: SubmitEvent) => {
     event.preventDefault();
-    localStorage.setItem('name', name());
-    room = pikoman.listenPresence('presence-lobby', authenticator(name()));
-    room.members((list: Map<string, Member>) => {
-      setMembers([...list]);
-      // Someone left: drop their cursor.
-      setCursors(produce((all) => Object.keys(all).forEach((id) => list.has(id) || delete all[id])));
-    });
-    // Client events come with the sender's connection id first.
-    room.on('move', (from: string, cursor: Cursor) => setCursors(from, cursor));
-    room.on('react', (_from: string, reaction: Omit<Reaction, 'id'>) => react(reaction));
-    setJoined(true);
+    // A second submit while the login is on its way would add every handler below twice.
+    if (joining() || joined()) return;
+    setJoining(true);
+    try {
+      localStorage.setItem('name', name());
+      // Stands in for your own login: server.mjs remembers the name in a session cookie.
+      const login = await fetch('/pikoman/login', {
+        method: 'POST',
+        headers: { 'content-type': 'application/json' },
+        body: JSON.stringify({ name: name() }),
+      });
+      if (!login.ok) return;
+      room = pikoman.listenPresence('presence-lobby', authenticator);
+      room.members((list: Map<string, Member>) => {
+        setMembers([...list]);
+        // Someone left: drop their cursor.
+        setCursors(produce((all) => Object.keys(all).forEach((id) => list.has(id) || delete all[id])));
+      });
+      // Client events are named client-…, and come with the sender's connection id first.
+      room.on('client-move', (from: string, cursor: Cursor) => setCursors(from, cursor));
+      room.on('client-react', (_from: string, reaction: Omit<Reaction, 'id'>) => react(reaction));
+      setJoined(true);
+    } finally {
+      setJoining(false);
+    }
   };
 
   // Positions go out as fractions of the window, so they land right on any screen size.
@@ -74,13 +89,13 @@ const App: Component = () => {
     const now = performance.now();
     if (!room || now - lastMove < MOVE_EVERY_MS) return;
     lastMove = now;
-    room.send('move', { x: event.clientX / innerWidth, y: event.clientY / innerHeight });
+    room.send('client-move', { x: event.clientX / innerWidth, y: event.clientY / innerHeight });
   };
   const onPointerDown = (event: PointerEvent) => {
     if (!room || (event.target as HTMLElement).closest('button, form')) return;
     const reaction = { x: event.clientX / innerWidth, y: event.clientY / innerHeight, emoji: emoji() };
     react(reaction); // ours shows at once; the others get it from Pikoman
-    room.send('react', reaction);
+    room.send('client-react', reaction);
   };
   onCleanup(() => pikoman.leaveChannel('presence-lobby'));
 
@@ -106,10 +121,10 @@ const App: Component = () => {
         when={joined()}
         fallback={
           <form class={styles.join} onSubmit={join}>
-            <h1>Live cursors, in 150 lines</h1>
+            <h1>Live cursors, in 160 lines</h1>
             <p>Join, then open this page in another window.</p>
             <input placeholder="Your name" value={name()} onInput={(e) => setName(e.currentTarget.value)} maxlength="32" required />
-            <button>Join the lobby</button>
+            <button disabled={joining()}>Join the lobby</button>
           </form>
         }
       >
