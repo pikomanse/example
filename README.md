@@ -45,10 +45,6 @@ node --input-type=module -e '
   await publish("main-channel", "announcement", { message: "Deploy finished: v2.4 is live" });'
 ```
 
-The snippet needs `@pikoman/ws` 1.0.0-rc.7 or later. This example pins rc.2, which is all the page
-needs, until rc.7 is published, and rc.2 has no `dist/server.js`: run the snippet where rc.7 is
-installed.
-
 Every open page shows the banner at once. From another language, sign the token yourself: an
 EdDSA JWT with the key id as `kid`, and `iss` (the app id), `iat`, `exp` (`iat` + 60), `htm`
 (`POST`), `htu` (`/main-channel/announcement`) and `bh` (SHA-256 of the exact body, base64url),
