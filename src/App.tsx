@@ -13,19 +13,11 @@ const EMOJI = ['👋', '🎉', '❤️', '🔥', '👀', '🚀'];
 /** Pikoman lets a connection send 10 client events a second; leave room for reactions. */
 const MOVE_EVERY_MS = 125;
 
+// auth_url: our own backend (server.mjs) signs join tokens; it knows who you are from your session.
 const pikoman = new Pikoman(import.meta.env.VITE_PIKOMAN_APP, {
+  auth_url: '/pikoman/auth',
   ...(import.meta.env.VITE_PIKOMAN_WS ? { ws_address: import.meta.env.VITE_PIKOMAN_WS } : {}),
 });
-
-/** Asks our own backend (server.mjs) for a join token: it knows who you are from your session. */
-const authenticator = {
-  async authenticate(clientId: string, channel: string): Promise<string> {
-    const query = new URLSearchParams({ client: clientId, channel });
-    const response = await fetch(`/pikoman/auth?${query}`);
-    if (!response.ok) throw new Error(`No join token (${response.status})`);
-    return (await response.json()).token;
-  },
-};
 
 const App: Component = () => {
   // A public channel: anyone with the app id may listen. Your backend publishes to it, signed with
@@ -68,7 +60,7 @@ const App: Component = () => {
         body: JSON.stringify({ name: name() }),
       });
       if (!login.ok) return;
-      room = pikoman.listenPresence('presence-lobby', authenticator);
+      room = pikoman.listenPresence('presence-lobby');
       room.members((list: Map<string, Member>) => {
         setMembers([...list]);
         // Someone left: drop their cursor.

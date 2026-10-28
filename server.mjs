@@ -4,7 +4,7 @@
 //   PIKOMAN_PRIVATE_KEY=... node server.mjs
 //
 // POST /pikoman/login {"name": "Anna"}             -> a session cookie for 12 hours (a stand-in for your login)
-// GET  /pikoman/auth?client={connection id}&channel={channel}
+// POST /pikoman/auth {"connection_id": "c_...", "channel": "..."}  (what @pikoman/ws sends to auth_url)
 //   -> {"token": "<JWT>"}, for a signed-in user, into a channel that user may join
 import { createServer } from "node:http";
 import { createPrivateKey, randomBytes, sign } from "node:crypto";
@@ -115,17 +115,18 @@ createServer(async (request, response) => {
     return name ? logIn(response, name) : answer(response, 400, { error: "A name, please" });
   }
 
-  if (request.method !== "GET" || url.pathname !== "/pikoman/auth") {
+  if (request.method !== "POST" || url.pathname !== "/pikoman/auth") {
     return answer(response, 404, { error: "Not found" });
   }
   const user = currentUser(request);
   if (!user) {
     return answer(response, 401, { error: "Sign in first" });
   }
-  const connection = url.searchParams.get("client") ?? "";
-  const channel = url.searchParams.get("channel") ?? "";
+  const body = await readJson(request).catch(() => undefined);
+  const connection = String(body?.connection_id ?? "");
+  const channel = String(body?.channel ?? "");
   if (!/^c_[A-Za-z0-9_-]{1,64}$/.test(connection)) {
-    return answer(response, 400, { error: "client must be the connection id" });
+    return answer(response, 400, { error: "connection_id must be the connection id" });
   }
   const access = accessFor(user, channel);
   if (access === undefined) {
